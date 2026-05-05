@@ -704,22 +704,36 @@ CREATE TABLE IF NOT EXISTS products (
 -- 2. Aktifkan RLS
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
--- 3. Siapapun bisa baca produk
+-- 3. Policy tabel produk (baca, tambah, edit, hapus)
 CREATE POLICY "baca_produk" ON products
   FOR SELECT USING (true);
+
+CREATE POLICY "tambah_produk" ON products
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "update_produk" ON products
+  FOR UPDATE USING (true);
+
+CREATE POLICY "hapus_produk" ON products
+  FOR DELETE USING (true);
 
 -- 4. Storage bucket untuk foto produk
 INSERT INTO storage.buckets (id, name, public)
   VALUES ('products', 'products', true)
   ON CONFLICT DO NOTHING;
 
--- 5. Siapapun bisa upload ke bucket (disesuaikan jika perlu)
+-- 5. Policy storage (upload, lihat, update, hapus)
 CREATE POLICY "upload_foto" ON storage.objects
   FOR INSERT WITH CHECK (bucket_id = 'products');
 
--- 6. Foto bisa diakses publik
 CREATE POLICY "lihat_foto" ON storage.objects
-  FOR SELECT USING (bucket_id = 'products');</code>
+  FOR SELECT USING (bucket_id = 'products');
+
+CREATE POLICY "update_foto" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'products');
+
+CREATE POLICY "hapus_foto" ON storage.objects
+  FOR DELETE USING (bucket_id = 'products');</code>
         <button onclick="salinSQL()" style="margin-top:7px;padding:5px 13px;border:1.5px solid var(--blue);border-radius:50px;background:#fff;color:var(--blue);font-family:'Nunito',sans-serif;font-weight:800;font-size:0.73rem;cursor:pointer;">📋 Salin SQL</button>
       </p>
       <div class="fg"><label>🔗 Supabase URL</label><input id="cUrl" type="text" placeholder="https://xamzashnpihgclqaplno.supabase.co" /></div>
@@ -827,15 +841,22 @@ CREATE POLICY "lihat_foto" ON storage.objects
 <script>
 /* ── CONFIG (localStorage) ── */
 let CFG = {
-  supabaseUrl:'', supabaseKey:'',
+  supabaseUrl:'https://xamzashnpihgclqaplno.supabase.co',
+  supabaseKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhbXphc2hucGloZ2NscWFwbG5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5Mzc4MTksImV4cCI6MjA5MzUxMzgxOX0.h0l6AVlhzWOhiqOgQo_Wim4xi-O-uXlK4pONPTjBJu0',
   adminUser:'admin', adminPass:'admin123',
   tgUsername:''
 };
 
 function loadCFG() {
   const s = localStorage.getItem('toko_cfg');
-  if (s) { CFG = {...CFG, ...JSON.parse(s)}; initSB(); }
-  else document.getElementById('cfgBanner').style.display='block';
+  // Merge localStorage di atas default (localStorage hanya override jika ada)
+  if (s) { CFG = {...CFG, ...JSON.parse(s)}; }
+  // Selalu init Supabase karena URL & key sudah hardcoded
+  if (CFG.supabaseUrl && CFG.supabaseKey) {
+    initSB();
+  } else {
+    document.getElementById('cfgBanner').style.display='block';
+  }
 }
 function saveCFG(obj) {
   CFG = {...CFG, ...obj};
