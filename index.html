@@ -705,17 +705,15 @@ CREATE TABLE IF NOT EXISTS products (
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
 -- 3. Policy tabel produk (baca, tambah, edit, hapus)
-CREATE POLICY "baca_produk" ON products
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "baca_produk"   ON products;
+DROP POLICY IF EXISTS "tambah_produk" ON products;
+DROP POLICY IF EXISTS "update_produk" ON products;
+DROP POLICY IF EXISTS "hapus_produk"  ON products;
 
-CREATE POLICY "tambah_produk" ON products
-  FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "update_produk" ON products
-  FOR UPDATE USING (true);
-
-CREATE POLICY "hapus_produk" ON products
-  FOR DELETE USING (true);
+CREATE POLICY "baca_produk"   ON products FOR SELECT USING (true);
+CREATE POLICY "tambah_produk" ON products FOR INSERT WITH CHECK (true);
+CREATE POLICY "update_produk" ON products FOR UPDATE USING (true);
+CREATE POLICY "hapus_produk"  ON products FOR DELETE USING (true);
 
 -- 4. Storage bucket untuk foto produk
 INSERT INTO storage.buckets (id, name, public)
@@ -723,17 +721,15 @@ INSERT INTO storage.buckets (id, name, public)
   ON CONFLICT DO NOTHING;
 
 -- 5. Policy storage (upload, lihat, update, hapus)
-CREATE POLICY "upload_foto" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'products');
+DROP POLICY IF EXISTS "upload_foto" ON storage.objects;
+DROP POLICY IF EXISTS "lihat_foto"  ON storage.objects;
+DROP POLICY IF EXISTS "update_foto" ON storage.objects;
+DROP POLICY IF EXISTS "hapus_foto"  ON storage.objects;
 
-CREATE POLICY "lihat_foto" ON storage.objects
-  FOR SELECT USING (bucket_id = 'products');
-
-CREATE POLICY "update_foto" ON storage.objects
-  FOR UPDATE USING (bucket_id = 'products');
-
-CREATE POLICY "hapus_foto" ON storage.objects
-  FOR DELETE USING (bucket_id = 'products');</code>
+CREATE POLICY "upload_foto" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'products');
+CREATE POLICY "lihat_foto"  ON storage.objects FOR SELECT USING (bucket_id = 'products');
+CREATE POLICY "update_foto" ON storage.objects FOR UPDATE USING (bucket_id = 'products');
+CREATE POLICY "hapus_foto"  ON storage.objects FOR DELETE USING (bucket_id = 'products');</code>
         <button onclick="salinSQL()" style="margin-top:7px;padding:5px 13px;border:1.5px solid var(--blue);border-radius:50px;background:#fff;color:var(--blue);font-family:'Nunito',sans-serif;font-weight:800;font-size:0.73rem;cursor:pointer;">📋 Salin SQL</button>
       </p>
       <div class="fg"><label>🔗 Supabase URL</label><input id="cUrl" type="text" placeholder="https://xamzashnpihgclqaplno.supabase.co" /></div>
