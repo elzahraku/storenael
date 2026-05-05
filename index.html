@@ -256,8 +256,9 @@ nav {
 .card-admin {
   display:none;
   position:absolute; top:8px; right:8px; gap:5px;
+  z-index:20;
 }
-.admin-mode .card-admin { display:flex; }
+.card.admin-mode .card-admin { display:flex; }
 .btn-ecard, .btn-dcard {
   width:30px; height:30px; border-radius:50%; border:none;
   cursor:pointer; font-size:0.78rem;
@@ -813,18 +814,18 @@ CREATE POLICY "hapus_foto"  ON storage.objects FOR DELETE USING (bucket_id = 'pr
   <div class="modal">
     <div class="m-hd"><h2>🎉 Konfirmasi Order</h2><button class="btn-x" onclick="closeM('mOrder')">✕</button></div>
     <div class="m-bd">
-      <div class="fg"><label>👤 Nama Kamu</label><input id="custName" type="text" placeholder="Masukkan namamu" /></div>
+      <div class="fg"><label>👤 Nama Kamu <span style="font-weight:600;color:var(--sub)">(opsional)</span></label><input id="custName" type="text" placeholder="Kosongkan jika tidak mau isi" /></div>
       <div class="ord-list" id="ordList"></div>
       <div class="ord-total"><span>Total</span><span id="ordTotal">Rp0</span></div>
       <div class="tg-note">
-        <span>✈️</span>
-        <span>Kamu akan dibuka ke Telegram Admin dengan detail orderan yang sudah terisi otomatis.</span>
+        <span>📋</span>
+        <span>Format order akan <strong>otomatis ter-copy</strong> & Telegram admin langsung terbuka. Tinggal kirim!</span>
       </div>
       <button class="btn-tg" onclick="sendToTelegram()">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.04 9.607c-.15.677-.548.843-1.11.524l-3-2.21-1.448 1.393c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.332-.373-.12l-6.871 4.326-2.962-.924c-.643-.203-.657-.643.136-.953l11.566-4.46c.535-.194 1.003.13.934.598z"/>
         </svg>
-        Kirim ke Admin Telegram
+        📋 Copy & Chat Admin Telegram
       </button>
     </div>
   </div>
@@ -947,8 +948,13 @@ function render() {
         <div class="card-desc">${esc(p.description||'-')}</div>
         <div class="card-price">${rp(p.price)}</div>
         <div class="card-actions">
+          ${isAdmin ? `
+          <button class="btn-ecard" style="flex:1;border-radius:50px;font-size:0.8rem;padding:7px 4px;" onclick="openEdit('${p.id}')">✏️ Edit</button>
+          <button class="btn-dcard" style="flex:1;border-radius:50px;font-size:0.8rem;padding:7px 4px;" onclick="confirmDel('${p.id}')">🗑️ Hapus</button>
+          ` : `
           <button class="btn-co btn-sm" onclick="quickCO('${p.id}')">⚡ Checkout</button>
           <button class="btn-ca btn-sm" onclick="addCart('${p.id}')">🛒 Keranjang</button>
+          `}
         </div>
       </div>
       <div class="card-admin">
@@ -1048,38 +1054,44 @@ function openOrderModal(items) {
   openM('mOrder');
 }
 
-function sendToTelegram() {
-  const name=document.getElementById('custName').value.trim();
-  if (!name) { toast('Masukkan namamu dulu!','err'); return; }
-  if (!CFG.tgUsername) { toast('Username Telegram admin belum diset!','err'); return; }
-
+function buildOrderMsg(name) {
   const items=pendingItems;
   const total=items.reduce((s,p)=>s+p.price,0);
-
+  const nm=name||'Pembeli';
   let msg=`🛍️ ORDER BARU - TokoDigital 🌈\n`;
   msg+=`━━━━━━━━━━━━━━━━━━\n`;
-  msg+=`👤 Nama: ${name}\n\n`;
-  msg+=`📦 Produk:\n`;
+  msg+=`👤 Nama: ${nm}\n\n`;
+  msg+=`📦 Produk yang dipesan:\n`;
   items.forEach((p,i)=>{
     msg+=`${i+1}. ${p.name}\n`;
-    msg+=`   💰 ${rp(p.price)}\n`;
+    msg+=`   💰 Harga: ${rp(p.price)}\n`;
     msg+=`   🛡️ ${p.label_garansi||'Garansi'}\n`;
-    if (p.description) msg+=`   📝 ${p.description.substring(0,80)}\n`;
-    msg+=`\n`;
   });
-  msg+=`━━━━━━━━━━━━━━━━━━\n`;
+  msg+=`\n━━━━━━━━━━━━━━━━━━\n`;
   msg+=`💵 Total: ${rp(total)}\n`;
   msg+=`━━━━━━━━━━━━━━━━━━\n`;
   msg+=`Mohon dikonfirmasi. Terima kasih! 🙏`;
+  return msg;
+}
 
+function sendToTelegram() {
+  if (!CFG.tgUsername) { toast('Username Telegram admin belum diset!','err'); return; }
+  const name=document.getElementById('custName').value.trim();
+  const msg=buildOrderMsg(name);
+
+  // Salin ke clipboard otomatis
+  navigator.clipboard.writeText(msg).then(()=>{
+    toast('✅ Pesan ter-copy! Paste di Telegram ya 📋','ok');
+  }).catch(()=>{});
+
+  // Buka Telegram dengan pesan sudah terisi
   const url=`https://t.me/${CFG.tgUsername}?text=${encodeURIComponent(msg)}`;
   window.open(url,'_blank');
   closeM('mOrder');
 
-  // kosongkan cart jika dari cart
+  // Kosongkan cart jika dari cart
   const fromCart=pendingItems.some(pi=>cart.find(c=>c.id===pi.id));
   if (fromCart) { cart=[]; updateCartBadge(); }
-  toast('Order dikirim ke admin! 🎉','ok');
 }
 
 /* ── ADMIN AUTH ── */
