@@ -574,6 +574,53 @@ nav {
 .toast.ok  { background:linear-gradient(135deg,var(--green),var(--teal)); }
 .toast.err { background:linear-gradient(135deg,var(--red),var(--orange)); }
 
+/* ─────────────────────────── VARIANTS ─────────────────────────── */
+.variant-list { display:flex; flex-direction:column; gap:7px; margin-bottom:8px; }
+.variant-row {
+  display:flex; gap:6px; align-items:center;
+}
+.variant-row input {
+  flex:1; padding:7px 10px;
+  border:2px solid var(--border); border-radius:var(--rs);
+  font-family:'Nunito',sans-serif; font-size:0.82rem; font-weight:600;
+  background:var(--bg); color:var(--text); outline:none;
+}
+.variant-row input:focus { border-color:var(--pink); }
+.btn-del-var {
+  width:28px; height:28px; border-radius:50%; border:none;
+  background:var(--red); color:#fff; cursor:pointer;
+  font-size:0.75rem; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:transform .18s;
+}
+.btn-del-var:hover { transform:scale(1.15); }
+.btn-add-var {
+  width:100%; padding:7px; border:2px dashed var(--pink);
+  background:transparent; border-radius:var(--rs);
+  color:var(--pink); font-family:'Nunito',sans-serif;
+  font-weight:800; font-size:0.8rem; cursor:pointer;
+  transition:all .2s; margin-bottom:4px;
+}
+.btn-add-var:hover { background:var(--pink); color:#fff; }
+/* Varian di card produk */
+.card-variants {
+  display:flex; flex-direction:column; gap:4px; margin-bottom:8px;
+}
+.var-btn {
+  width:100%; padding:5px 8px;
+  border:2px solid var(--border); border-radius:var(--rs);
+  background:#fff; cursor:pointer;
+  font-family:'Nunito',sans-serif; font-weight:700; font-size:0.73rem;
+  display:flex; justify-content:space-between; align-items:center;
+  transition:all .18s; color:var(--text);
+}
+.var-btn:hover, .var-btn.selected {
+  border-color:var(--pink); background:linear-gradient(135deg,#fff0f6,#f8f0ff);
+  color:var(--pink);
+}
+.var-btn .var-price { color:var(--pink); font-weight:800; }
+.var-btn.selected .var-price { color:var(--purple); }
+
 /* ─────────────────────────── SECTION LABEL ─────────────────────────── */
 .sec-title {
   font-family:'Baloo 2',cursive;
@@ -689,7 +736,10 @@ nav {
     <div class="m-bd">
       <p style="font-size:0.78rem;font-weight:700;color:var(--sub);margin-bottom:14px;">
         Jalankan SQL ini di <strong>Supabase → SQL Editor</strong>:
-        <code id="sqlCode" style="display:block;background:#1e1e2e;color:#cdd6f4;padding:11px 13px;border-radius:8px;margin-top:7px;font-size:0.7rem;white-space:pre-wrap;line-height:1.6;max-height:220px;overflow-y:auto;">-- 1. Tabel produk
+        <code id="sqlCode" style="display:block;background:#1e1e2e;color:#cdd6f4;padding:11px 13px;border-radius:8px;margin-top:7px;font-size:0.7rem;white-space:pre-wrap;line-height:1.6;max-height:220px;overflow-y:auto;">-- 0. Tambah kolom variants (jalankan sekali jika tabel sudah ada)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS variants JSONB DEFAULT '[]';
+
+-- 1. Tabel produk
 CREATE TABLE IF NOT EXISTS products (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
@@ -793,9 +843,12 @@ CREATE POLICY "hapus_foto"  ON storage.objects FOR DELETE USING (bucket_id = 'pr
       </div>
       <div class="fg"><label>📦 Nama Produk</label><input id="pName" type="text" placeholder="Netflix Premium 1 Bulan" /></div>
       <div class="fg"><label>📝 Deskripsi</label><textarea id="pDesc" placeholder="Jelaskan produk..."></textarea></div>
-      <div class="frow">
-        <div class="fg"><label>💰 Harga (Rp)</label><input id="pPrice" type="number" placeholder="50000" /></div>
-        <div class="fg"><label>🏷️ Kategori</label><input id="pCat" type="text" placeholder="Streaming" /></div>
+      <div class="fg"><label>🏷️ Kategori</label><input id="pCat" type="text" placeholder="Streaming" /></div>
+      <div class="fg">
+        <label>💰 Varian Harga <span style="font-weight:600;color:var(--sub);font-size:0.72rem">(min. 1 varian)</span></label>
+        <div class="variant-list" id="variantList"></div>
+        <button type="button" class="btn-add-var" onclick="addVariantRow()">➕ Tambah Varian</button>
+        <span style="font-size:0.7rem;color:var(--sub);font-weight:700">Contoh: "1P1U" → 10000 &nbsp;|&nbsp; "1P2U" → 20000</span>
       </div>
       <div class="frow">
         <div class="fg"><label>🛡️ Label Garansi</label><input id="pGar" type="text" placeholder="Garansi 30 Hari" value="Garansi 30 Hari" /></div>
@@ -946,7 +999,7 @@ function render() {
       <div class="card-body">
         <div class="card-name">${esc(p.name)}</div>
         <div class="card-desc">${esc(p.description||'-')}</div>
-        <div class="card-price">${rp(p.price)}</div>
+        ${renderVariants(p)}
         <div class="card-actions">
           ${isAdmin ? `
           <button class="btn-ecard" style="flex:1;border-radius:50px;font-size:0.8rem;padding:7px 4px;" onclick="openEdit('${p.id}')">✏️ Edit</button>
@@ -990,10 +1043,12 @@ function rp(n) { return 'Rp'+(n||0).toLocaleString('id-ID'); }
 function addCart(id) {
   const p = products.find(x=>x.id===id);
   if (!p) return;
-  if (cart.find(x=>x.id===id)) { toast('Sudah ada di keranjang! 🛒','err'); return; }
-  cart.push(p);
+  const variant = getSelectedVariant(id);
+  const cartKey = id+'_'+variant.label;
+  if (cart.find(x=>x._cartKey===cartKey)) { toast('Varian ini sudah ada di keranjang!','err'); return; }
+  cart.push({...p, _cartKey:cartKey, selectedVariant:variant, price:variant.price});
   updateCartBadge();
-  toast(p.name+' ditambahkan! 🎉','ok');
+  toast(p.name+' ('+variant.label+') ditambahkan! 🎉','ok');
 }
 function removeCart(id) { cart=cart.filter(x=>x.id!==id); updateCartBadge(); renderCartList(); }
 function updateCartBadge() {
@@ -1032,8 +1087,10 @@ function checkoutCart() {
 function quickCO(id) {
   const p=products.find(x=>x.id===id);
   if (!p) return;
-  pendingItems=[p];
-  openOrderModal([p]);
+  const variant = getSelectedVariant(id);
+  const item = {...p, selectedVariant: variant, price: variant.price};
+  pendingItems=[item];
+  openOrderModal([item]);
 }
 
 /* ── ORDER MODAL ── */
@@ -1063,7 +1120,8 @@ function buildOrderMsg(name) {
   msg+=`👤 Nama: ${nm}\n\n`;
   msg+=`📦 Produk yang dipesan:\n`;
   items.forEach((p,i)=>{
-    msg+=`${i+1}. ${p.name}\n`;
+    const varLabel = p.selectedVariant ? p.selectedVariant.label : '';
+    msg+=`${i+1}. ${p.name}${varLabel?' ('+varLabel+')':''}\n`;
     msg+=`   💰 Harga: ${rp(p.price)}\n`;
     msg+=`   🛡️ ${p.label_garansi||'Garansi'}\n`;
   });
@@ -1145,14 +1203,80 @@ let currentImageUrl = '';
 // Simpan file yang dipilih (sebelum diupload)
 let selectedFile = null;
 
+/* ── VARIANT HELPERS ── */
+function getVariants() {
+  const rows = document.querySelectorAll('#variantList .variant-row');
+  const vars = [];
+  rows.forEach(row => {
+    const label = row.querySelector('.var-label').value.trim();
+    const price = parseInt(row.querySelector('.var-price-inp').value);
+    if (label && price > 0) vars.push({label, price});
+  });
+  return vars;
+}
+function addVariantRow(label='', price='') {
+  const list = document.getElementById('variantList');
+  const row = document.createElement('div');
+  row.className = 'variant-row';
+  row.innerHTML = `
+    <input class="var-label" type="text" placeholder="Misal: 1P1U" value="${label}" />
+    <input class="var-price-inp" type="number" placeholder="Harga" value="${price}" style="max-width:110px" />
+    <button type="button" class="btn-del-var" onclick="this.closest('.variant-row').remove()">✕</button>
+  `;
+  list.appendChild(row);
+}
+function loadVariantRows(variants) {
+  document.getElementById('variantList').innerHTML = '';
+  if (variants && variants.length) {
+    variants.forEach(v => addVariantRow(v.label, v.price));
+  } else {
+    addVariantRow(); // 1 baris kosong default
+  }
+}
+/* Render varian di card produk */
+function renderVariants(p) {
+  const vars = p.variants && p.variants.length ? p.variants : [{label:'Harga', price: p.price||0}];
+  if (vars.length === 1) {
+    return `<div class="card-price">${rp(vars[0].price)}</div>`;
+  }
+  return `<div class="card-variants" id="vars_${p.id}">
+    ${vars.map((v,i)=>`
+      <button class="var-btn${i===0?' selected':''}"
+        onclick="selectVariant('${p.id}',${i})"
+        data-price="${v.price}" data-label="${esc(v.label)}">
+        <span>${esc(v.label)}</span>
+        <span class="var-price">${rp(v.price)}</span>
+      </button>`).join('')}
+  </div>`;
+}
+function selectVariant(pid, idx) {
+  const container = document.getElementById('vars_'+pid);
+  if (!container) return;
+  container.querySelectorAll('.var-btn').forEach((b,i)=>{
+    b.classList.toggle('selected', i===idx);
+  });
+}
+function getSelectedVariant(pid) {
+  const p = products.find(x=>x.id===pid);
+  if (!p) return null;
+  const vars = p.variants && p.variants.length ? p.variants : [{label:'Harga', price: p.price||0}];
+  if (vars.length === 1) return vars[0];
+  const container = document.getElementById('vars_'+pid);
+  if (!container) return vars[0];
+  const sel = container.querySelector('.var-btn.selected');
+  if (!sel) return vars[0];
+  return {label: sel.dataset.label, price: parseInt(sel.dataset.price)};
+}
+
 function openProductModal() {
   editId=null;
   currentImageUrl='';
   selectedFile=null;
   document.getElementById('prodMTitle').textContent='➕ Tambah Produk';
-  ['pName','pDesc','pPrice','pCat'].forEach(id=>document.getElementById(id).value='');
+  ['pName','pDesc','pCat'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pGar').value='Garansi 30 Hari';
   document.getElementById('pHot').value='false';
+  loadVariantRows([]);
   resetUpload();
   document.getElementById('btnDel').style.display='none';
   openM('mProduct');
@@ -1165,10 +1289,10 @@ function openEdit(id) {
   document.getElementById('prodMTitle').textContent='✏️ Edit Produk';
   document.getElementById('pName').value=p.name;
   document.getElementById('pDesc').value=p.description||'';
-  document.getElementById('pPrice').value=p.price;
   document.getElementById('pCat').value=p.category||'';
   document.getElementById('pGar').value=p.label_garansi||'Garansi 30 Hari';
   document.getElementById('pHot').value=p.is_hot?'true':'false';
+  loadVariantRows(p.variants||[{label:'Harga', price: p.price||0}]);
   if (p.image_url) {
     setPreview(p.image_url);
     setStatus('✅ Gambar tersimpan','ok');
@@ -1312,9 +1436,9 @@ function handleDrop(e) {
 
 async function saveProduct() {
   const name=document.getElementById('pName').value.trim();
-  const price=parseInt(document.getElementById('pPrice').value);
   if (!name) { toast('Nama produk wajib diisi!','err'); return; }
-  if (!price||price<=0) { toast('Harga harus diisi!','err'); return; }
+  const variants = getVariants();
+  if (!variants.length) { toast('Minimal 1 varian harga!','err'); return; }
   // Jika ada file yang belum terupload (misal Supabase baru dikonfigurasi)
   if (selectedFile && !currentImageUrl.startsWith('http')) {
     if (SB) {
@@ -1322,10 +1446,12 @@ async function saveProduct() {
       await uploadToStorage(selectedFile);
     }
   }
+  const minPrice = Math.min(...variants.map(v=>v.price));
   const payload={
     name,
     description:document.getElementById('pDesc').value.trim(),
-    price,
+    price: minPrice,
+    variants: variants,
     image_url: currentImageUrl || '',
     category:document.getElementById('pCat').value.trim()||'Umum',
     label_garansi:document.getElementById('pGar').value.trim()||'Garansi 30 Hari',
