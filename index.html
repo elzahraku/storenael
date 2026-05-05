@@ -845,9 +845,13 @@ let CFG = {
 
 function loadCFG() {
   const s = localStorage.getItem('toko_cfg');
-  // Merge localStorage di atas default (localStorage hanya override jika ada)
-  if (s) { CFG = {...CFG, ...JSON.parse(s)}; }
-  // Selalu init Supabase karena URL & key sudah hardcoded
+  if (s) {
+    const saved = JSON.parse(s);
+    // Hanya merge supabaseUrl & supabaseKey dari localStorage
+    // adminUser, adminPass, tgUsername selalu pakai hardcoded
+    if (saved.supabaseUrl) CFG.supabaseUrl = saved.supabaseUrl;
+    if (saved.supabaseKey) CFG.supabaseKey = saved.supabaseKey;
+  }
   if (CFG.supabaseUrl && CFG.supabaseKey) {
     initSB();
   } else {
@@ -1116,7 +1120,7 @@ function saveConfig() {
   const ap=document.getElementById('cAP').value.trim();
   const tg=document.getElementById('cTG').value.trim().replace(/^@/,'');
   if (!url||!key) { toast('URL dan Key Supabase wajib diisi!','err'); return; }
-  saveCFG({supabaseUrl:url,supabaseKey:key,adminUser:au||'admin',adminPass:ap||'admin123',tgUsername:tg});
+  saveCFG({supabaseUrl:url,supabaseKey:key,adminUser:au||CFG.adminUser,adminPass:ap||CFG.adminPass,tgUsername:tg||CFG.tgUsername});
   closeM('mConfig');
   document.getElementById('cfgBanner').style.display='none';
   initSB();
